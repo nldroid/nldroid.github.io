@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+</head>
+
+<style>
+.canvas-layers { position:relative; width:400px; height:400px }
+.canvas-layers canvas { position:absolute; top:0; left:0 }
+body, p { font-family: arial; }
+label { 
+  font-family: inherit; 
+  float: left;
+  width: 150px;
+  padding-right: 10px;  
+}
+input {
+  font-family: inherit; 
+  border: none;
+} 
+
+</style>
+
+<body>
+<form action="javascript:void(0);">
+<p>
+<label for="favcolor">Background color:</label>
+<input type="color" id="colorWatchFace" name="colorWatchFace" value="#000000">
+<input id="colorWatchFaceTxt" type="colorWatchFaceTxt" value="#000000" readonly/>
+</p>
+<p>
+<label for="favcolor">Tickmark color:</label>
+<input type="color" id="colorTickmark" name="colorTickmark" value="#FFFFFF">
+<input id="colorTickmarkTxt" type="colorTickmarkTxt" value="#FFFFFF" readonly/>
+</p>
+<p>
+<label for="favcolor">Text color:</label>
+<input type="color" id="colorText" name="colorText" value="#FFFFFF">
+<input id="colorTextTxt" type="colorTextTxt" value="#FFFFFF" readonly/>
+</p>
+<p>
+<label for="favcolor">Hour line color:</label>
+<input type="color" id="colorHourLine" name="colorHourLine" value="#FF0000">
+<input id="colorHourLineTxt" type="colorHourLineTxt" value="#FF0000" readonly/>
+</p>
+</form>
+
+<div class="canvas-layers">
+<canvas id="canvasWatchFace" width="400" height="400" style="background-color:white"></canvas>
+<canvas id="canvasTickmarks" width="400" height="400"></canvas>
+<canvas id="canvasOverlay" width="400" height="400"></canvas>
+</div>
+
+<script>
+
+var canvasWatchFace = document.getElementById("canvasWatchFace");
+var canvasTickmarks = document.getElementById("canvasTickmarks");
+var canvasOverlay = document.getElementById("canvasOverlay");
+
+var ctxWatchFace = canvasWatchFace.getContext("2d");
+var ctxTickmarks = canvasTickmarks.getContext("2d");
+var ctxOverlay = canvasOverlay.getContext("2d");
+
+var radius = canvasWatchFace.height / 2;
+var xWatchCenter = canvasWatchFace.height / 2;
+var yWatchCenter = canvasWatchFace.height / 2;
+
+var colorWatchFace = document.getElementById("colorWatchFace");
+var colorWatchFaceTxt = document.getElementById("colorWatchFaceTxt");
+
+var colorTickmark = document.getElementById("colorTickmark");
+var colorTickMarkTxt = document.getElementById("colorTickmarkTxt");
+
+var colorText = document.getElementById("colorText");
+var colorTextTxt = document.getElementById("colorTextTxt");
+
+var colorHourLine = document.getElementById("colorHourLine");
+var colorHourLineTxt = document.getElementById("colorHourLineTxt");
+
+var zoom_factor;
+var focal_point;
+
+zoom_factor = 2.1;
+focal_point = 0.8;
+
+colorWatchFace.addEventListener("input", function() {
+  ctxWatchFace.fillStyle = colorWatchFace.value;
+  ctxWatchFace.fill();
+  colorWatchFaceTxt.value = colorWatchFace.value;
+}, false); 
+
+colorTickmark.addEventListener("input", function() {
+  ctxTickmarks.fillStyle = colorTickmark.value;
+  colorTickMarkTxt.value = colorTickmark.value;
+  drawNumbers(colorTickMarkTxt.value);
+  drawTickmarks(colorTickMarkTxt.value);
+}, false);
+
+colorText.addEventListener("input", function() {
+  ctxWatchFace.fillStyle = colorText.value;
+  drawNumbers(colorText.value);
+  colorTextTxt.value = colorText.value;
+}, false); 
+
+colorHourLine.addEventListener("input", function() {
+  ctxWatchFace.fillStyle = colorHourLine.value;
+  drawHour(colorHourLine.value);
+  colorHourLineTxt.value = colorHourLine.value;
+}, false); 
+
+radius = radius * 0.90 // Reduce the clock radius (to 90%) to draw the clock well inside the canvas
+drawClock();
+drawOuter();
+drawHour("red");
+clearArc(canvasOverlay, ctxOverlay,radius,radius,radius);
+
+
+function clearArc(canvas, context, x, y, radius) {
+	context.clearRect(0, 0, canvas.width, canvas.height);
+
+	// Draw the green hulk to clear
+  context.beginPath();
+  context.fillStyle = "#FFFFFF" //'rgba(0, 255, 0, 0.5)';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.save();
+  context.globalCompositeOperation = 'destination-out';
+  context.beginPath();
+  context.arc(canvas.width/2, canvas.height/2, radius, 0, 2 * Math.PI, false);
+  context.fill();
+  context.restore();
+}
+
+function drawClock() {
+  ctxWatchFace.arc(xWatchCenter, yWatchCenter, radius, 0 , 2 * Math.PI);
+  ctxWatchFace.fillStyle = "black";
+  ctxWatchFace.fill();
+  drawNumbers("white");
+  drawTickmarks("white");
+}
+
+function drawOuter() {
+  ctxWatchFace.resetTransform();
+  ctxWatchFace.beginPath(); 
+  ctxWatchFace.arc(xWatchCenter, yWatchCenter, radius+1, 0 , 2 * Math.PI);
+  ctxWatchFace.stroke();
+}
+
+function drawNumbers(color) {
+  var ang;
+  var num;
+  var number_radius;
+
+  number_radius = radius*zoom_factor * 0.85;
+  ctxTickmarks.resetTransform();
+  ctxTickmarks.fillStyle = color;
+  ctxTickmarks.strokeStyle = color;
+  ctxTickmarks.font = radius * 0.15 + "px arial";
+  ctxTickmarks.textBaseline = "middle";
+  ctxTickmarks.textAlign = "center";
+  for(num = 4; num < 6; num++){ // origineel 1 < 13
+    ang = num * Math.PI / 6;
+    ctxTickmarks.rotate(ang);
+    ctxTickmarks.translate(0, -number_radius);
+    ctxTickmarks.rotate(-ang);
+    ctxTickmarks.fillText(num.toString(), 0, 0);
+    ctxTickmarks.rotate(ang);
+    ctxTickmarks.translate(0, number_radius);
+    ctxTickmarks.rotate(-ang);
+  }
+}
+
+function drawTickmarks(color) {
+  var num;
+  var mark;
+  var tickmark_radius;
+
+  tickmark_radius = radius*zoom_factor * 0.95;
+  
+  for(num = 4; num < 6; num++){ // origineel 1 < 13
+	mark = (num*Math.PI/6)
+	drawHand(ctxTickmarks, mark, tickmark_radius, 20, 2, color);
+  }
+  for(num = 7; num < 12; num++){
+	mark = ((num*Math.PI/12))
+	drawHand(ctxTickmarks, mark, tickmark_radius, 10, 2, color);
+  }
+  for(num = 21; num < 34; num++){
+	mark = ((num*Math.PI/36))
+	drawHand(ctxTickmarks, mark, tickmark_radius, 4, 2, color);
+  }
+  drawHour(colorHourLine.value);
+}
+
+function drawHour(color) {
+  ctxTickmarks.resetTransform();
+  drawHand(ctxTickmarks, 4.5*Math.PI/6, radius*2+102, radius*2, 2, color);
+}
+
+function drawHand(ctx, pos, start, length, width, color) {
+  ctx.strokeStyle = color;	
+  ctx.beginPath();
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.moveTo(0,0);
+  ctx.rotate(pos);
+  ctx.moveTo(0,-start);
+  ctx.lineTo(0, -start+length);
+  ctx.stroke();
+  ctx.rotate(-pos);
+}
+
+</script>
+
+</body>
+</html>
